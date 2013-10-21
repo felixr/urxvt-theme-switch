@@ -1,0 +1,106 @@
+#!/usr/bin/env perl -w
+#
+# Change color theme.
+#
+# Based on John Tyree's rotate-colors
+# 
+# License: CCBYNC
+
+#  URxvt.perl-ext-common: color-themes
+#  URxvt.color-themes.dir
+#  URxvt.keysym.M-C-n:  perl:color-themes:next
+#  URxvt.keysym.M-C-p:  perl:color-themes:prev
+
+use strict;
+
+sub on_start {
+    my ($self) = @_;
+    $self->{current_index} = 0;
+    my $path =  $self->x_resource('color-themes.themedir') 
+                    || "~/.themes/urxvt";
+    opendir(DIR, $path) or die $!;
+
+    my @arr   = grep { -f "$path/$_" } readdir(DIR);
+    @arr = map { "$path/$_"; } @arr;
+
+    $self->{color_files} = \@arr;
+    ()
+}
+
+sub read_colors {
+    my $fn = shift;
+    open my $fin, $fn or print STDERR "Unable to open $fn for reading";
+    my %colors;
+
+    while (my $line = <$fin>) {
+        if ($line =~ /(\w+)\s*:\s*(#[0-9a-fA-F]+)/) {
+            $colors{$1} = $2;
+        }
+    }
+
+    return %colors
+}
+
+sub escape_seq {
+    my ($k, $v) = @_;
+    my $cmd = "";
+    if ($k =~ /^color(\d+)$/) {
+        $cmd = "4;$1;$v";
+    } elsif ($k =~ /^colorBD$/) {
+        $cmd = "5;0;$v";
+    } elsif ($k =~ /^colorUL$/) {
+        $cmd = "5;1;$v";
+    } elsif ($k =~ /^colorBL$/) {
+        $cmd = "5;2;$v";
+    } elsif ($k =~ /^colorRV$/) {
+        $cmd = "5;3;$v";
+    } elsif ($k =~ /^foreground$/) {
+        $cmd = "10;$v";
+    } elsif ($k =~ /^background$/) {
+        $cmd = "11;$v";
+    } elsif ($k =~ /^cursorColor$/) {
+        $cmd = "12;$v";
+    } elsif ($k =~ /^pointerColor$/) {
+        $cmd = "13;$v";
+    }
+
+    return "\033]".$cmd."\007";
+}
+
+sub build_cmd {
+    my $fn = shift;
+    my %colors = read_colors($fn);
+    my $s =  join("", map {escape_seq($_, $colors{$_})} keys %colors);
+
+    return $s
+}
+
+sub key_press {
+   my ($self, $event, $keysym, $string) = @_;
+
+   delete $self->{overlay};
+   $self->disable ("key_press");
+
+   1
+}
+
+sub on_user_command {
+    my ($self, $cmd) = @_;
+    my @fs = @{$self->{color_files}};
+    my $len = @fs;
+    my $idx = 0;
+    if ($cmd eq "color-themes:next") {
+        $idx = $self->{current_index}++;
+    } elsif ($cmd eq "color-themes:prev") {
+        $idx = $self->{current_index}--;
+    }
+    my $fn = $fs[$idx % scalar(@fs)];
+    $self->cmd_parse(build_cmd($fn));
+
+    my $msg = " Color scheme: ".$fn;
+
+    $self->{overlay} = $self->overlay (0, -1, $self->strwidth($msg)+1, 1, urxvt::OVERLAY_RSTYLE, 0);
+    $self->{overlay}->set (0, 0, $msg);
+    $self->enable (key_press => \&key_press);
+    ()
+}
