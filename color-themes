@@ -18,6 +18,7 @@ sub on_start {
     $self->{current_index} = 0;
     my $path =  $self->x_resource('color-themes.themedir') 
                     || "~/.themes/urxvt";
+    $path = glob($path);
     opendir(DIR, $path) or die $!;
 
     my @arr   = grep { -f "$path/$_" } readdir(DIR);
