@@ -3,7 +3,7 @@
 # Change color theme.
 #
 # Based on John Tyree's rotate-colors
-# 
+#
 # License: CCBYNC
 
 #  URxvt.perl-ext-common: color-themes
@@ -16,15 +16,17 @@ use strict;
 sub on_start {
     my ($self) = @_;
     $self->{current_index} = 0;
-    my $path =  $self->x_resource('color-themes.themedir') 
+    my $path = $self->x_resource('color-themes.themedir')
                     || "~/.themes/urxvt";
     $path = glob($path);
-    opendir(DIR, $path) or die $!;
 
-    my @arr   = grep { -f "$path/$_" } readdir(DIR);
-    @arr = map { "$path/$_"; } @arr;
-
+    my @arr = ();
+    if (opendir(DIR, $path)) {
+        @arr   = grep { -f "$path/$_" } readdir(DIR);
+        @arr = map { "$path/$_"; } @arr;
+    }
     $self->{color_files} = \@arr;
+    $self->{theme_dir} = $path;
     ()
 }
 
@@ -89,16 +91,20 @@ sub on_user_command {
     my ($self, $cmd) = @_;
     my @fs = @{$self->{color_files}};
     my $len = @fs;
-    my $idx = 0;
-    if ($cmd eq "color-themes:next") {
-        $idx = $self->{current_index}++;
-    } elsif ($cmd eq "color-themes:prev") {
-        $idx = $self->{current_index}--;
+    my $msg = "";
+    if ($len > 0) {
+        my $idx = 0;
+        if ($cmd eq "color-themes:next") {
+            $idx = $self->{current_index}++;
+        } elsif ($cmd eq "color-themes:prev") {
+            $idx = $self->{current_index}--;
+        }
+        my $fn = $fs[$idx % $len];
+        $self->cmd_parse(build_cmd($fn));
+        $msg = " Color scheme: ".$fn;
+    } else {
+        $msg = " No color schemes found in ".$self->{theme_dir};
     }
-    my $fn = $fs[$idx % scalar(@fs)];
-    $self->cmd_parse(build_cmd($fn));
-
-    my $msg = " Color scheme: ".$fn;
 
     $self->{overlay} = $self->overlay (0, -1, $self->strwidth($msg)+1, 1, urxvt::OVERLAY_RSTYLE, 0);
     $self->{overlay}->set (0, 0, $msg);
