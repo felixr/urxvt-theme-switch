@@ -5,34 +5,62 @@
 # Based on John Tyree's rotate-colors
 #
 # License: CCBYNC
-
+#
 #  URxvt.perl-ext-common: color-themes
 #  URxvt.color-themes.dir
 #  URxvt.keysym.M-C-n:  perl:color-themes:next
 #  URxvt.keysym.M-C-p:  perl:color-themes:prev
-
+#
+#  URxvt.color-themes.state-file: ~/.urxvt-theme
+#  URxvt.color-themes.autosave: 1
+#  URxvt.keysym.M-C-l:  perl:color-themes:load-state
+#  URxvt.keysym.M-C-s:  perl:color-themes:save-state
+#
 use strict;
 
 sub on_start {
     my ($self) = @_;
     $self->{current_index} = 0;
-    my $path = $self->x_resource('color-themes.themedir')
-      || "~/.themes/urxvt";
-    $path = glob($path);
+    my $path =
+      glob( $self->x_resource('color-themes.themedir') || "~/.themes/urxvt" );
 
     my @arr = ();
     if ( opendir( DIR, $path ) ) {
         @arr = grep { -f "$path/$_" } readdir(DIR);
         @arr = map  { "$path/$_"; } @arr;
     }
-    $self->{theme_files} = \@arr;
-    $self->{theme_dir}   = $path;
+    $self->{theme_files}     = \@arr;
+    $self->{theme_dir}       = $path;
+    $self->{auto_save_state} = $self->x_resource('color-themes.autosave') || 0;
+    $self->{settingsfile} =
+      glob( $self->x_resource('color-themes.state-file') || "~/.urxvt-theme" );
+
+    load_state($self);
+
     ();
+}
+
+sub load_state {
+    my $self = shift;
+    my $fn   = $self->{settingsfile};
+    open my $fin, $fn
+      or print STDERR "Unable to open $fn for reading" && return;
+    $self->cmd_parse(<$fin>);
+    close($fin);
+}
+
+sub save_state {
+    my $self = shift;
+    my $esc  = shift;
+    my $fno  = $self->{settingsfile};
+    open( OUT, ">$fno" ) or print STDERR "Unable to open $fno for writing";
+    print OUT $esc;
+    close(OUT);
 }
 
 sub read_commands {
     my $fn = shift;
-    open my $fin, $fn or print STDERR "Unable to open $fn for reading";
+    open my $fin, $fn or print STDERR "Unable to open $fn for reading\n";
     my %commands;
 
     while ( my $line = <$fin> ) {
@@ -40,11 +68,13 @@ sub read_commands {
             $commands{$1} = $2;
         }
     }
+    close($fin);
 
-    return %colors;
+    return %commands;
 }
 
 sub escape_seq {
+
     # XTerm Operating System Commands
     my %commands = (
         'colorBD'          => '5;0',
@@ -106,16 +136,24 @@ sub on_user_command {
     my @fs  = @{ $self->{theme_files} };
     my $len = @fs;
     my $msg = "";
+    if ( $cmd eq "color-themes:load-state" ) {
+        load_state($self);
+        return ();
+    }
     if ( $len > 0 ) {
-        my $idx = 0;
+        my $idx = $self->{current_index};
         if ( $cmd eq "color-themes:next" ) {
-            $idx = $self->{current_index}++;
+            $idx = ++$self->{current_index};
         }
         elsif ( $cmd eq "color-themes:prev" ) {
-            $idx = $self->{current_index}--;
+            $idx = --$self->{current_index};
         }
-        my $fn = $fs[ $idx % $len ];
-        $self->cmd_parse( build_cmd($fn) );
+        my $fn  = $fs[ $idx % $len ];
+        my $esc = build_cmd($fn);
+        if ( $self->{auto_save_state} or $cmd eq "color-themes:save-state" ) {
+            save_state( $self, $esc );
+        }
+        $self->cmd_parse($esc);
         $msg = " Theme:" . $fn;
     }
     else {
