@@ -88,7 +88,7 @@ sub escape_seq {
         'highlightColor'   => '17',
         'backgroundPixmap' => '20',
         'italicColor'      => '704',
-        'backgroundTint'   => '705',
+        'tintColor'        => '705',
         'boldColor'        => '706',
         'underlinedColor'  => '707',
         'borderColor'      => '708',
