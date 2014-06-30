@@ -17,97 +17,114 @@ sub on_start {
     my ($self) = @_;
     $self->{current_index} = 0;
     my $path = $self->x_resource('color-themes.themedir')
-                    || "~/.themes/urxvt";
+      || "~/.themes/urxvt";
     $path = glob($path);
 
     my @arr = ();
-    if (opendir(DIR, $path)) {
-        @arr   = grep { -f "$path/$_" } readdir(DIR);
-        @arr = map { "$path/$_"; } @arr;
+    if ( opendir( DIR, $path ) ) {
+        @arr = grep { -f "$path/$_" } readdir(DIR);
+        @arr = map  { "$path/$_"; } @arr;
     }
-    $self->{color_files} = \@arr;
-    $self->{theme_dir} = $path;
-    ()
+    $self->{theme_files} = \@arr;
+    $self->{theme_dir}   = $path;
+    ();
 }
 
-sub read_colors {
+sub read_commands {
     my $fn = shift;
     open my $fin, $fn or print STDERR "Unable to open $fn for reading";
-    my %colors;
+    my %commands;
 
-    while (my $line = <$fin>) {
-        if ($line =~ /(\w+)\s*:\s*(#[0-9a-fA-F]+)/) {
-            $colors{$1} = $2;
+    while ( my $line = <$fin> ) {
+        if ( $line =~ /(\w+)\s*:\s*([^!]+)\s*\n/ ) {
+            $commands{$1} = $2;
         }
     }
 
-    return %colors
+    return %colors;
 }
 
 sub escape_seq {
-    my ($k, $v) = @_;
+    # XTerm Operating System Commands
+    my %commands = (
+        'colorBD'          => '5;0',
+        'colorUL'          => '5;1',
+        'colorBL'          => '5;2',
+        'colorRV'          => '5;3',
+        'foreground'       => '10',
+        'background'       => '11',
+        'cursorColor'      => '12',
+        'pointerColor'     => '13',
+        'highlightColor'   => '17',
+        'backgroundPixmap' => '20',
+        'italicColor'      => '704',
+        'backgroundTint'   => '705',
+        'boldColor'        => '706',
+        'underlinedColor'  => '707',
+        'borderColor'      => '708',
+        'font'             => '710',
+        'boldFont'         => '711',
+        'italicFont'       => '712',
+        'boldItalicFont'   => '713'
+    );
+
+    my ( $k, $v ) = @_;
     my $cmd = "";
-    if ($k =~ /^color(\d+)$/) {
+
+    if ( $k =~ /^color(\d+)$/ ) {
         $cmd = "4;$1;$v";
-    } elsif ($k =~ /^colorBD$/) {
-        $cmd = "5;0;$v";
-    } elsif ($k =~ /^colorUL$/) {
-        $cmd = "5;1;$v";
-    } elsif ($k =~ /^colorBL$/) {
-        $cmd = "5;2;$v";
-    } elsif ($k =~ /^colorRV$/) {
-        $cmd = "5;3;$v";
-    } elsif ($k =~ /^foreground$/) {
-        $cmd = "10;$v";
-    } elsif ($k =~ /^background$/) {
-        $cmd = "11;$v";
-    } elsif ($k =~ /^cursorColor$/) {
-        $cmd = "12;$v";
-    } elsif ($k =~ /^pointerColor$/) {
-        $cmd = "13;$v";
+    }
+    else {
+        if ( not exists( $commands{$k} ) ) {
+            return "";
+        }
+        $cmd = "$commands{$k};$v";
     }
 
-    return "\033]".$cmd."\007";
+    return "\033]" . $cmd . "\007";
 }
 
 sub build_cmd {
-    my $fn = shift;
-    my %colors = read_colors($fn);
-    my $s =  join("", map {escape_seq($_, $colors{$_})} keys %colors);
+    my $fn       = shift;
+    my %commands = read_commands($fn);
+    my $s = join( "", map { escape_seq( $_, $commands{$_} ) } keys %commands );
 
-    return $s
+    return $s;
 }
 
 sub key_press {
-   my ($self, $event, $keysym, $string) = @_;
+    my ( $self, $event, $keysym, $string ) = @_;
 
-   delete $self->{overlay};
-   $self->disable ("key_press");
+    delete $self->{overlay};
+    $self->disable("key_press");
 
-   1
+    return 1;
 }
 
 sub on_user_command {
-    my ($self, $cmd) = @_;
-    my @fs = @{$self->{color_files}};
+    my ( $self, $cmd ) = @_;
+    my @fs  = @{ $self->{theme_files} };
     my $len = @fs;
     my $msg = "";
-    if ($len > 0) {
+    if ( $len > 0 ) {
         my $idx = 0;
-        if ($cmd eq "color-themes:next") {
+        if ( $cmd eq "color-themes:next" ) {
             $idx = $self->{current_index}++;
-        } elsif ($cmd eq "color-themes:prev") {
+        }
+        elsif ( $cmd eq "color-themes:prev" ) {
             $idx = $self->{current_index}--;
         }
-        my $fn = $fs[$idx % $len];
-        $self->cmd_parse(build_cmd($fn));
-        $msg = " Color scheme: ".$fn;
-    } else {
-        $msg = " No color schemes found in ".$self->{theme_dir};
+        my $fn = $fs[ $idx % $len ];
+        $self->cmd_parse( build_cmd($fn) );
+        $msg = " Theme:" . $fn;
+    }
+    else {
+        $msg = " No themes found in " . $self->{theme_dir};
     }
 
-    $self->{overlay} = $self->overlay (0, -1, $self->strwidth($msg)+1, 1, urxvt::OVERLAY_RSTYLE, 0);
-    $self->{overlay}->set (0, 0, $msg);
-    $self->enable (key_press => \&key_press);
-    ()
+    $self->{overlay} = $self->overlay( 0, -1, $self->strwidth($msg) + 1,
+        1, urxvt::OVERLAY_RSTYLE, 0 );
+    $self->{overlay}->set( 0, 0, $msg );
+    $self->enable( key_press => \&key_press );
+    ();
 }
