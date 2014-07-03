@@ -136,21 +136,26 @@ sub on_user_command {
     my @fs  = @{ $self->{theme_files} };
     my $len = @fs;
     my $msg = "";
-    if ( $cmd eq "color-themes:load-state" ) {
+    my @parts = split(/:/, $cmd);
+    if (not $parts[0] eq "color-themes") {
+        return;
+    }
+    my $subcmd = $parts[1];
+    if ( $subcmd eq "load-state" ) {
         load_state($self);
         return ();
     }
     if ( $len > 0 ) {
         my $idx = $self->{current_index};
-        if ( $cmd eq "color-themes:next" ) {
+        if ( $subcmd eq "next" ) {
             $idx = ++$self->{current_index};
         }
-        elsif ( $cmd eq "color-themes:prev" ) {
+        elsif ( $subcmd eq "prev" ) {
             $idx = --$self->{current_index};
         }
         my $fn  = $fs[ $idx % $len ];
         my $esc = build_cmd($fn);
-        if ( $self->{auto_save_state} or $cmd eq "color-themes:save-state" ) {
+        if ( $self->{auto_save_state} or $subcmd eq "save-state" ) {
             save_state( $self, $esc );
         }
         $self->cmd_parse($esc);
