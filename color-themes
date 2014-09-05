@@ -17,6 +17,7 @@
 #  URxvt.keysym.M-C-s:  perl:color-themes:save-state
 #
 use strict;
+use File::Which;
 
 sub on_start {
     my ($self) = @_;
@@ -60,10 +61,18 @@ sub save_state {
 
 sub read_commands {
     my $fn = shift;
-    open my $fin, $fn or print STDERR "Unable to open $fn for reading\n";
     my %commands;
 
+    my $fin;
+    if(which("gcc")){
+        # use gcc to substitute #define statements
+        open($fin, "gcc -x c -E \"$fn\" |") or print STDERR "Unable to run gcc on $fn for reading\n";
+    }else{
+        open($fin, "$fn") or print STDERR "Unable to open $fn for reading\n";
+    }
+
     while ( my $line = <$fin> ) {
+        next if $line =~ /^#/;
         if ( $line =~ /(\w+)\s*:\s*([^!]+)\s*\n/ ) {
             $commands{$1} = $2;
         }
