@@ -11,7 +11,7 @@
 # Settings:
 #
 #  URxvt.perl-ext-common: color-themes
-#  URxvt.color-themes.dir
+#  URxvt.color-themes.themedir:  ~/.themes/urxvt
 #  URxvt.keysym.M-C-n:  perl:color-themes:next
 #  URxvt.keysym.M-C-p:  perl:color-themes:prev
 #
@@ -21,7 +21,6 @@
 #  URxvt.keysym.M-C-s:  perl:color-themes:save-state
 #
 use strict;
-use File::Which;
 
 sub on_start {
     my ($self) = @_;
@@ -32,6 +31,7 @@ sub on_start {
     my @arr = ();
     if ( opendir( DIR, $path ) ) {
         @arr = grep { -f "$path/$_" } readdir(DIR);
+        @arr = sort @arr;
         @arr = map  { "$path/$_"; } @arr;
     }
     $self->{theme_files}     = \@arr;
@@ -68,12 +68,8 @@ sub read_commands {
     my %commands;
 
     my $fin;
-    if(which("cpp")){
-        # use cpp to substitute #define statements
-        open($fin, "cpp \"$fn\" |") or print STDERR "Unable to run cpp on $fn for reading\n";
-    }else{
-        open($fin, "$fn") or print STDERR "Unable to open $fn for reading\n";
-    }
+    #open with c pre-processor
+    open($fin, "cpp \"$fn\" |") or print STDERR "Unable to run cpp on $fn for reading\n";
 
     while ( my $line = <$fin> ) {
         next if $line =~ /^#/;
@@ -172,7 +168,8 @@ sub on_user_command {
             save_state( $self, $esc );
         }
         $self->cmd_parse($esc);
-        $msg = " Theme:" . $fn;
+        $fn =~ s{.*/}{};
+        $msg = " Theme: " . $fn;
     }
     else {
         $msg = " No themes found in " . $self->{theme_dir};
