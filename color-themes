@@ -1,10 +1,14 @@
 #!/usr/bin/env perl -w
 #
 # Change color theme.
+# Credit: https://github.com/felixr
+# Original repo: https://github.com/felixr/urxvt-theme-switch
 #
 # Based on John Tyree's rotate-colors
 #
 # License: CCBYNC
+#
+# Settings:
 #
 #  URxvt.perl-ext-common: color-themes
 #  URxvt.color-themes.dir
@@ -64,9 +68,9 @@ sub read_commands {
     my %commands;
 
     my $fin;
-    if(which("gcc")){
-        # use gcc to substitute #define statements
-        open($fin, "gcc -x c -E \"$fn\" |") or print STDERR "Unable to run gcc on $fn for reading\n";
+    if(which("cpp")){
+        # use cpp to substitute #define statements
+        open($fin, "cpp \"$fn\" |") or print STDERR "Unable to run cpp on $fn for reading\n";
     }else{
         open($fin, "$fn") or print STDERR "Unable to open $fn for reading\n";
     }
