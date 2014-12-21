@@ -5,11 +5,13 @@
 # Based on John Tyree's rotate-colors
 #
 # License: CCBYNC
+# Homepage: https://github.com/felixr/urxvt-theme-switch
 #
 # Settings:
 #
 #  URxvt.perl-ext-common: color-themes
 #  URxvt.color-themes.themedir:  ~/.themes/urxvt
+#  URxvt.color-themes.preprocessor: /usr/bin/cpp
 #  URxvt.keysym.M-C-n:  perl:color-themes:next
 #  URxvt.keysym.M-C-p:  perl:color-themes:prev
 #
@@ -37,6 +39,8 @@ sub on_start {
     $self->{auto_save_state} = $self->x_resource('color-themes.autosave') || 0;
     $self->{settingsfile} =
       glob( $self->x_resource('color-themes.state-file') || "~/.urxvt-theme" );
+    $self->{preprocessor} =
+      glob( $self->x_resource('color-themes.preprocessor') || "" );
 
     load_state($self);
 
@@ -63,7 +67,14 @@ sub save_state {
 
 sub read_commands {
     my $fn = shift;
-    open my $fin, $fn or print STDERR "Unable to open $fn for reading\n";
+    my $preproc = shift;
+    my $fin;
+    if ($preproc eq '') {
+	open($fin, $fn) or print STDERR "Unable to open $fn for reading\n";
+    } else {
+	open($fin, "$preproc \"$fn\" |")
+	    or print STDERR "Unable to open $fn using '$preproc' \n";
+    }
     my %commands;
 
     while ( my $line = <$fin> ) {
@@ -119,7 +130,8 @@ sub escape_seq {
 
 sub build_cmd {
     my $fn       = shift;
-    my %commands = read_commands($fn);
+    my $preproc  = shift;
+    my %commands = read_commands($fn, $preproc);
     my $s = join( "", map { escape_seq( $_, $commands{$_} ) } keys %commands );
 
     return $s;
@@ -157,7 +169,7 @@ sub on_user_command {
             $idx = --$self->{current_index};
         }
         my $fn  = $fs[ $idx % $len ];
-        my $esc = build_cmd($fn);
+        my $esc = build_cmd($fn, $self->{preprocessor});
         if ( $self->{auto_save_state} or $subcmd eq "save-state" ) {
             save_state( $self, $esc );
         }
